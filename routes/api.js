@@ -3,13 +3,29 @@ const router = express.Router();
 const Profile = require('../models/profile')
 const PostItem = require('../models/postItem')
 const Review = require('../models/review')
+var multer  = require('multer')
+var fs = require('fs');
 
+var upload = multer({ dest: 'uploads/' })
+
+
+var storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads')
+  },
+  filename: function (req, file, cb) {
+    cb(null, file.fieldname + '-' + Date.now())
+  }
+})
+ 
+var upload = multer({ storage: storage })
 
 
 //get Posts
 router.get("/post_item", async (request, response) => {
   console.log("getting post request")
   try {
+      var result
       var pageSize = 1
       var pageNumber = parseInt(request.query.page_number);
 
@@ -17,7 +33,13 @@ router.get("/post_item", async (request, response) => {
 
       console.log("page size"+pageSize,"page number"+pageNumber);
       var total = await PostItem.find().exec();
-      var result = await PostItem.find().limit(pageSize).skip(pageNumber).exec();
+      if(pageNumber==0){
+         result = await PostItem.find().limit(pageSize).skip(pageNumber).exec();
+      }
+      else{
+        result = await PostItem.find().limit(pageSize).sort({_id:-1}).skip(pageNumber).exec();
+      }
+      
 
       var responseFull = ({
         "page": pageNumber,
@@ -45,23 +67,7 @@ router.post('/feed_item',async function(req,res){
   }
 });
 
-//upload an image
-router.post('/files', function(req, res) {
-  if (!req.files || Object.keys(req.files).length === 0) {
-    return res.status(400).send('No files were uploaded.');
-  }
 
-  // The name of the input field (i.e. "sampleFile") is used to retrieve the uploaded file
-  let sampleFile = req.files.sampleFile;
-
-  // Use the mv() method to place the file somewhere on your server
-  sampleFile.mv('images', function(err) {
-    if (err)
-      return res.status(500).send(err);
-
-    res.send('File uploaded!');
-  });
-});
 
 //save new review
 router.post('/review',async function(req,res){
@@ -113,5 +119,25 @@ Profile.findByIdAndRemove({_id:req.params.id}).then(function(profile){
     res.send(profile);
 });
 });
+
+router.post('/upload', upload.single('image'), (req, res, next) => {
+  const file = req.file
+  if (!file) {
+    const error = new Error('Please upload a file')
+    error.httpStatusCode = 400
+    return next(error)
+  }
+  var imageBuffer = new Buffer.from(req.body.file, 'base64');
+
+  fs.writeFile('/uploads/myfile.jpg', imageBuffer , function (err) {
+    if (err) return next(err)
+
+  })
+
+    res.send(file)
+
+  
+});
+
 
 module.exports = router;
